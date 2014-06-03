@@ -277,7 +277,7 @@ class Actions(object):
             # get the desired seed
             keyresults = self.seeds.list(**kwargs)
             if keyresults and not args.nick == '*' and self.output:
-                self.output(keyresults, "\n Found GKEY seeds:")
+                self.output(['', keyresults], "\n Found GKEY seeds:")
             elif keyresults and self.output:
                 self.output(['all'], "\n Installing seeds:")
             else:
@@ -306,6 +306,7 @@ class Actions(object):
                     continue
                 self.logger.debug("ACTIONS: addkey; adding key:")
                 self.logger.debug("ACTIONS: " + str(key))
+                print(key)
                 results[key.name] = self.gpg.add_key(key)
                 for result in results[key.name]:
                     self.logger.debug("ACTIONS: addkey; result.failed = " +
