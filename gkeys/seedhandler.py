@@ -31,7 +31,7 @@ class SeedHandler(object):
             newgkey = GKEY(**newgkey)
             self.logger.debug("SeedHandler: new() new gkey: %s" % str(newgkey))
         else:
-            self.logger.debug("SeedHandler: new() FAILED to et parts from: %s"
+            self.logger.debug("SeedHandler: new() FAILED to get parts from: %s"
                 % str(args))
             return None
         return newgkey
