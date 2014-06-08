@@ -25,6 +25,7 @@ from os.path import join as pjoin
 
 from pyGPG.gpg import GPG
 from gkeys.log import logger
+from gkeys.seed import Seeds
 
 
 class GkeysGPG(GPG):
@@ -96,6 +97,12 @@ class GkeysGPG(GPG):
         self.set_keyserver()
         self.set_keydir(gkey.keydir, 'recv-keys', reset=True)
         self.set_keyring('pubring.gpg', 'recv-keys', reset=False)
+        # Save the gkey seed to the installed db
+        self.seedfile = Seeds(pjoin(self.keydir, 'gkey.seeds'))
+        self.seedfile.add(gkey.nick[0], gkey)
+        if not self.seedfile.save():
+            logger.debug("LIB: add_key; fsailed to save seed" + gkey.nick)
+            return []
         if not os.path.exists(self.keydir):
             os.makedirs(self.keydir, mode=0x0700)
         keyids = gkey.keyid
