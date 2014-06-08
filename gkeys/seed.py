@@ -88,19 +88,16 @@ class Seeds(object):
         return False
 
 
-    def delete(self, gkey=None, index=None):
+    def delete(self, gkey=None):
         '''Delete the key from the seeds in memory
 
         @param gkey: GKEY, the matching GKEY to delete
-        @param index: int, '''
+        '''
         if gkey:
             try:
                 self.seeds.pop(getattr(gkey[0], 'nick')[0], None)
             except ValueError:
                 return False
-            return True
-        elif index:
-            self.seeds.pop(index)
             return True
 
 
@@ -124,19 +121,6 @@ class Seeds(object):
     def search(self, pattern):
         '''Search for the keys matching the regular expression pattern'''
         pass
-
-
-    def index(self, gkey):
-        '''The index of the gkey in the seeds list
-
-        @param gkey: GKEY, the matching GKEY to delete
-        @return int
-        '''
-        try:
-            index = self.seeds.index(gkey)
-        except ValueError:
-            return None
-        return index
 
 
     def _error(self, err):
