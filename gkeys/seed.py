@@ -95,7 +95,7 @@ class Seeds(object):
         '''
         if gkey:
             try:
-                self.seeds.pop(getattr(gkey[0], 'nick')[0], None)
+                self.seeds.pop(gkey.nick[0])
             except ValueError:
                 return False
             return True
@@ -123,6 +123,18 @@ class Seeds(object):
         pass
 
 
+    def nick_search(self, nick):
+        '''Searches the seeds for a matching nick
+
+        @param nick: string
+        @returns GKEY instance or None
+        '''
+        try:
+            return self.seeds[nick]
+        except KeyError:
+            return None
+
+
     def _error(self, err):
         '''Class error logging function'''
         logger.error("Seed: Error processing seed file %s" % self.filename)
@@ -137,3 +149,15 @@ class Seeds(object):
             if is_gkey:
                 seeds[dev] = dict(value._asdict())
         return json.dumps(seeds, sort_keys=True, indent=4)
+
+
+    def update(self, gkey):
+        '''looks for existance of a matching nick already in the seedfile
+        if it exists.  Then either adds or replaces the gkey
+
+        @param gkey: GKEY instance
+        '''
+        oldkey = self.nick_search(gkey.nick[0])
+        if oldkey:
+            self.delete(oldkey)
+        self.add(gkey.nick[0], gkey)
