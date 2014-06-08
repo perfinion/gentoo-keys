@@ -112,7 +112,7 @@ class GkeysGPG(GPG):
             logger.debug("LIB: add_key; final keyids" + keyid)
             logger.debug("** Calling runGPG with Running 'gpg %s --recv-keys %s' for: %s"
                 % (' '.join(self.config.get_key('tasks', 'recv-keys')),
-                    keyid, gkey.name)
+                    keyid, gkey.name[0])
                 )
             result = self.runGPG(task='recv-keys', inputfile=keyid)
             logger.info('GPG return code: ' + str(result.returncode))
@@ -131,6 +131,7 @@ class GkeysGPG(GPG):
                 message += "\n     gkey..: %s" %(str(gkey.fingerprint))
                 logger.error(message)
             results.append(result)
+            print("lib.add_key(), result =")
             print(result.stderr_out)
         return results
 
@@ -158,26 +159,29 @@ class GkeysGPG(GPG):
         return []
 
 
-    def list_keys(self, keydir):
+    def list_keys(self, keydirs):
         '''List all keys in the specified keydir or
-        all keys in all keydir if keydir=None
+        all keys in all keydir if keydirs=None
 
-        @param keydir: the keydir to list the keys for
+        @param keydirs: the keydirs to list the keys for
         '''
-        if not keydir:
+        if not keydirs:
             logger.debug("LIB: list_keys(), invalid keydir parameter: %s"
-                % str(keydir))
+                % str(keydirs))
             return []
-        if '--with-colons' in self.config['tasks']['list-keys']:
-            self.config['tasks']['list-keys'].remove('--with-colons')
+        results = {}
+        for keydir in keydirs:
+            if '--with-colons' in self.config['tasks']['list-keys']:
+                self.config['tasks']['list-keys'].remove('--with-colons')
 
-        self.set_keydir(keydir, 'list-keys')
-        logger.debug("** Calling runGPG with Running 'gpg %s --list-keys %s'"
-            % (' '.join(self.config['tasks']['list-keys']), keydir)
-            )
-        result = self.runGPG(task='list-keys', inputfile=keydir)
-        logger.info('GPG return code: ' + str(result.returncode))
-        return result
+            self.set_keydir(keydir, 'list-keys')
+            logger.debug("** Calling runGPG with Running 'gpg %s --list-keys %s'"
+                % (' '.join(self.config['tasks']['list-keys']), keydir)
+                )
+            result = self.runGPG(task='list-keys', inputfile=keydir)
+            logger.info('GPG return code: ' + str(result.returncode))
+            results[keydir] = result
+        return results
 
 
     def list_keydirs(self):
