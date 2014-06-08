@@ -22,7 +22,7 @@ from gkeys import config
 from gkeys import seed
 from gkeys import lib
 
-from gkeys.config import GKeysConfig
+from gkeys.config import GKeysConfig, GKEY
 from gkeys.actions import Actions, Available_Actions
 
 
@@ -150,8 +150,11 @@ class Main(object):
         for msg in results:
             if isinstance(msg, str):
                 print(msg)
-            else:
-                print("\n".join([x.pretty_print for x in msg]))
+            elif isinstance(msg, list):
+                if isinstance(msg[0], GKEY):
+                    print("\n".join([x.pretty_print for x in msg]))
+                else:
+                    print("\n".join(msg))
         print()
 
 
