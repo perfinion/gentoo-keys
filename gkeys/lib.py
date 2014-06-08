@@ -78,7 +78,7 @@ class GkeysGPG(GPG):
 
     def set_keydir(self, keydir, task, reset=True):
         logger.debug("basedir: %s, keydir: %s" % (self.basedir, keydir))
-        self.keydir = pjoin(self.basedir, keydir[0])
+        self.keydir = pjoin(self.basedir, keydir)
         self.task = task
         if reset:
             self.config.options['tasks'][task] = self.config.defaults['tasks'][task][:]
@@ -95,44 +95,45 @@ class GkeysGPG(GPG):
             (name, keyid/longkeyid, keydir, fingerprint,)
         '''
         self.set_keyserver()
-        self.set_keydir(gkey.keydir, 'recv-keys', reset=True)
-        self.set_keyring('pubring.gpg', 'recv-keys', reset=False)
-        # Save the gkey seed to the installed db
-        self.seedfile = Seeds(pjoin(self.keydir, 'gkey.seeds'))
-        self.seedfile.add(gkey.nick[0], gkey)
-        if not self.seedfile.save():
-            logger.debug("LIB: add_key; fsailed to save seed" + gkey.nick)
-            return []
-        if not os.path.exists(self.keydir):
-            os.makedirs(self.keydir, mode=0x0700)
-        keyids = gkey.keyid
-        results = []
-        print(self.config['tasks']['recv-keys'])
-        for keyid in keyids:
-            logger.debug("LIB: add_key; final keyids" + keyid)
-            logger.debug("** Calling runGPG with Running 'gpg %s --recv-keys %s' for: %s"
-                % (' '.join(self.config.get_key('tasks', 'recv-keys')),
-                    keyid, gkey.name[0])
-                )
-            result = self.runGPG(task='recv-keys', inputfile=keyid)
-            logger.info('GPG return code: ' + str(result.returncode))
-            if result.fingerprint in gkey.fingerprint:
-                result.failed = False
-                message = "Fingerprints match... Import successful: "
-                message += "key: %s" %keyid
-                message += "\n    result len: %s, %s" %(len(result.fingerprint), result.fingerprint)
-                message += "\n    gkey len: %s, %s" %(len(gkey.fingerprint[0]), gkey.fingerprint[0])
-                logger.info(message)
-            else:
-                result.failed = True
-                message = "Fingerprints do not match... Import failed for "
-                message += "key: %s" %keyid
-                message += "\n     result:   %s" %(result.fingerprint)
-                message += "\n     gkey..: %s" %(str(gkey.fingerprint))
-                logger.error(message)
-            results.append(result)
-            print("lib.add_key(), result =")
-            print(result.stderr_out)
+        for keydir in gkey.keydir:
+            self.set_keydir(keydir, 'recv-keys', reset=True)
+            self.set_keyring('pubring.gpg', 'recv-keys', reset=False)
+            # Save the gkey seed to the installed db
+            self.set_keyseedfile()
+            self.seedfile.update(gkey)
+            if not self.seedfile.save():
+                logger.error("GkeysGPG.add_key(); failed to save seed" + gkey.nick[0])
+                return []
+            if not os.path.exists(self.keydir):
+                os.makedirs(self.keydir, mode=0x0700)
+            fingerprints = gkey.fingerprint
+            results = []
+            print(self.config['tasks']['recv-keys'])
+            for fingerprint in fingerprints:
+                logger.debug("LIB: add_key; adding fingerprint" + fingerprint)
+                logger.debug("** Calling runGPG with Running 'gpg %s --recv-keys %s' for: %s"
+                    % (' '.join(self.config.get_key('tasks', 'recv-keys')),
+                        fingerprint, gkey.name[0])
+                    )
+                result = self.runGPG(task='recv-keys', inputfile=keyid)
+                logger.info('GPG return code: ' + str(result.returncode))
+                if result.fingerprint in gkey.fingerprint:
+                    result.failed = False
+                    message = "Fingerprints match... Import successful: "
+                    message += "key: %s" %keyid
+                    message += "\n    result len: %s, %s" %(len(result.fingerprint), result.fingerprint)
+                    message += "\n    gkey len: %s, %s" %(len(gkey.fingerprint[0]), gkey.fingerprint[0])
+                    logger.info(message)
+                else:
+                    result.failed = True
+                    message = "Fingerprints do not match... Import failed for "
+                    message += "key: %s" %keyid
+                    message += "\n     result:   %s" %(result.fingerprint)
+                    message += "\n     gkey..: %s" %(str(gkey.fingerprint))
+                    logger.error(message)
+                results.append(result)
+                print("lib.add_key(), result =")
+                print(result.stderr_out)
         return results
 
 
@@ -163,7 +164,7 @@ class GkeysGPG(GPG):
         '''List all keys in the specified keydir or
         all keys in all keydir if keydirs=None
 
-        @param keydirs: the keydirs to list the keys for
+        @param keydir: the keydirs to list the keys for
         '''
         if not keydirs:
             logger.debug("LIB: list_keys(), invalid keydir parameter: %s"
@@ -209,3 +210,7 @@ class GkeysGPG(GPG):
         '''
         pass
 
+
+    def set_keyseedfile(self):
+        self.seedfile = Seeds(pjoin(self.keydir, 'gkey.seeds'))
+        self.seedfile.load()
