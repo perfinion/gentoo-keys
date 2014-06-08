@@ -248,18 +248,22 @@ class Actions(object):
             for key in keyresults:
                 if not key.keydir and not args.nick == '*':
                     self.logger.debug("ACTIONS: listkey; NO keydir... Ignoring")
-                    return {"Failed: No keyid's found for %s" % key.name : ''}
+                    return {"Failed: No keyid's found for %s" % key.name[0] : ''}
                 self.logger.debug("ACTIONS: listkey; listing keydir:"
                     + str(key.keydir))
-                results[key.name] = self.gpg.list_keys(key.keydir)
+                results[key.nick[0]] = self.gpg.list_keys(key.keydir)
                 if self.config.options['print_results']:
-                    print(results[key.name].output)
-                    self.logger.debug("data output:\n" +
-                        str(results[key.name].output))
-                    #for result in results[key.name].status.data:
-                        #print("key desired:", key.name, ", keydir listed:",
-                            #result)
-                        #self.logger.debug("data record: " + str(result))
+                    for nick in sorted(results):
+                        print("actions.listkey(), nick =", nick)
+                        print('output:', results[nick][nick].output)
+                        print('stderr_out:', results[nick][nick].stderr_out)
+                        print('messages:', results[nick][nick].messages)
+                        #self.logger.debug("data output:\n" +
+                            #str(results[name].output))
+                        #for result in results[key.name[0]].status.data:
+                            #print("key desired:", key.name[0], ", keydir listed:",
+                                #result)
+                            #self.logger.debug("data record: " + str(result))
                 else:
                     return results
             return {'done': True}
@@ -297,23 +301,24 @@ class Actions(object):
             results = {}
             failed = []
             for key in keyresults:
-                if not key.keyid and not key.longkeyid and not args.nick == '*':
-                    self.logger.debug("ACTIONS: addkey; NO key id's to add... Ignoring")
-                    return {"Failed: No keyid's found for %s" % key.name : ''}
+                if not key.fingerprint and not args.nick == '*':
+                    self.logger.debug("ACTIONS: addkey; NO fingerprints to add... Ignoring")
+                    return {"Failed: No fingerprints found for %s" % key.name[0] : ''}
                 elif not key.keyid and not key.longkeyid:
-                    print("No keyid's found for:", key.nick, key.name, "Skipping...")
+                    print("No keyid's found for:", key.nick, key.name[0], "Skipping...")
                     failed.append(key)
                     continue
                 self.logger.debug("ACTIONS: addkey; adding key:")
                 self.logger.debug("ACTIONS: " + str(key))
-                print(key)
-                results[key.name] = self.gpg.add_key(key)
-                for result in results[key.name]:
+                print("actions.addkey, key =", key)
+                print("key.name[0] =", key.name[0])
+                results[key.name[0]] = self.gpg.add_key(key)
+                for result in results[key.name[0]]:
                     self.logger.debug("ACTIONS: addkey; result.failed = " +
                         str(result.failed))
                 if self.config.options['print_results']:
-                    for result in results[key.name]:
-                        print("key desired:", key.name, ", key added:",
+                    for result in results[key.name[0]]:
+                        print("key desired:", key.name[0], ", key added:",
                             result.username, ", succeeded:",
                             not result.failed, ", keyid:", result.keyid,
                             ", fingerprint:", result.fingerprint)
