@@ -17,7 +17,6 @@ import os
 from collections import defaultdict
 from json import load
 from shutil import rmtree
-from sslfetch.connections import Connector
 
 from gkeys.lib import GkeysGPG
 from gkeys.seedhandler import SeedHandler
@@ -570,12 +569,6 @@ class Actions(object):
 
     def verify(self, args):
         '''File verification action'''
-        connector_output = {
-             'info': self.logger.debug,
-             'error': self.logger.error,
-             'kwargs-info': {},
-             'kwargs-error': {},
-        }
         if not args.filename:
             return (False, ['Please provide a signed file.'])
         if not args.category:
