@@ -13,6 +13,17 @@
 from gkeys.config import GKEY_CHECK
 
 
+ALGORITHM_CODES = {
+    '1': 'RSA',
+    '2': 'RSA',      # (encrypt only)
+    '3': 'RSA',      # (sign only)
+    '16': 'ElGamal', # (encrypt only)
+    '17': 'DSA',     #(sometimes called DH, sign only)
+    '18': 'ECDH',
+    '19': 'ECDSA',
+    '20': 'ElGamal'  # (sign and encrypt)
+}
+
 # Default glep 63 minimum gpg key specification
 TEST_SPEC = {
     'bits': {
@@ -21,7 +32,7 @@ TEST_SPEC = {
         },
     'expire': 36,      # in months
     'subkeys': {        # warning/error mode
-        'encryption': {
+        'encrypt': {
             'mode': 'notice',
             'expire': -1,  # -1 is the primary key expirery
             },
@@ -30,7 +41,7 @@ TEST_SPEC = {
             'expire': 12,
             },
         },
-    'type': ['DSA', 'RSA'],
+    'type': ['DSA', 'RSA', '1', '2', '3', '17'],
     'version': 4,
 }
 
