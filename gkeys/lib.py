@@ -287,11 +287,43 @@ class GkeysGPG(GPG):
         return valid, glep_approved
 
 
+    def verify_text(self, gkey, text, sig=None):
+        '''Verify and decode a text block in memory
 
-    def verify_text(self, text):
-        '''Verify a text block in memory
+        @param gkey: GKEY instance of the gpg key used to verify it
+        @param text: str
+        @param sig: Optional detached signature filepath
+        @return: decoded text, boolean
         '''
-        pass
+        logger.debug("LIB.verify_text(), verify & decrypt text: "
+            " %s, type(text)=%s" % (str(url),str(type(text))), 2)
+        #logger.debug(text, 2)
+        self.set_keydir(gkey.keydir, 'verify', reset=True)
+
+        # detached sig
+        if sig:
+            logger.debug("LIB.verify_text(), detached sig", 2)
+            gpg_result = self.verify(
+                inputtxt=text,
+                inputfile=sig)
+        # armoured signed file, compressed or clearsigned
+        else:
+            logger.debug("LIB.verify_text(), single signed file", 2)
+            gpg_result = self.decrypt(
+                inputtxt=text)
+            logger.info('GPG return code: ' + str(result.returncode))
+            text = gpg_result.output
+        # verify and report
+        logger.debug("LIB.verify_text(), gpg_result, verified=%s, len(text)=%s"
+            % (gpg_result.verified[0], str(len(text))), 1)
+        if gpg_result.verified[0]:
+            logger.info("GPG verification succeeded for gpg-signed url.", 4)
+            logger.info('\tSignature result:' + str(gpg_result.verified), 4)
+        else:
+            logger.error("GPG verification failed for gpg-signed url.")
+            logger.error('\tSignature result:' + str(gpg_result.verified))
+            text = ''
+        return text, gpg_result.verified[0]
 
 
     def verify_file(self, gkey, signature, filepath):
