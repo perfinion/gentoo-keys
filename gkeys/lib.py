@@ -277,7 +277,15 @@ class GkeysGPG(GPG):
 
         @param gkey: GKEY namedtuple with (name, keyid/longkeyid, fingerprint)
         '''
-        pass
+        result = self.list_keys(gkey.keydir, colons=True)
+        checker = KeyChecks(logger)
+        valid = {}
+        glep_approved = {}
+        for keyid in gkey.keyid:
+            valid[keyid] = checker.validity_checks(gkey.keydir, keyid, result)
+            glep_approved = checker.glep_check(gkey, keyid, result)
+        return valid, glep_approved
+
 
 
     def verify_text(self, text):
