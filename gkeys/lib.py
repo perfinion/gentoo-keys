@@ -206,7 +206,7 @@ class GkeysGPG(GPG):
             task = 'list-keys'
             target = keydir
         self.set_keydir(keydir, task, fingerprint=True)
-        self.config.options['tasks'][task].extend(['--keyid-format', 'long'])
+        self.config.options['tasks'][task].extend(['--keyid-format', 'long', '--with-fingerprint'])
         if colons:
             task_value = ['--with-colons']
             self.config.options['tasks'][task].extend(task_value)
@@ -229,6 +229,14 @@ class GkeysGPG(GPG):
         if not result:
             result = self.list_keys(keydir, fingerprint=keyid, colons=True)
         checker = KeyChecks(logger)
+        print("========")
+        #print(result.output)
+        gleps = checker.glep_check(keydir, keyid, result)
+        #print(gleps)
+        for g in gleps:
+            for key in gleps[g]:
+                print(key)
+        print()
         return checker.validity_checks(keydir, keyid, result)
 
 
