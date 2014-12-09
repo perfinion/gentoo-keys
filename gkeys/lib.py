@@ -228,14 +228,13 @@ class GkeysGPG(GPG):
         '''
         if not result:
             result = self.list_keys(keydir, fingerprint=keyid, colons=True)
-        checker = KeyChecks(logger)
-        print("========")
+        checker = KeyChecks(logger, qualified_id_check=True)
         #print(result.output)
         gleps = checker.glep_check(keydir, keyid, result)
         #print(gleps)
         for g in gleps:
             for key in gleps[g]:
-                print(key)
+                print(key.pretty_print())
         print()
         return checker.validity_checks(keydir, keyid, result)
 

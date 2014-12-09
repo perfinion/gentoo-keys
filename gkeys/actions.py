@@ -311,7 +311,8 @@ class Actions(object):
         self.output('', '\n Checking keys...')
         for gkey in sorted(keyresults):
             self.logger.info("Checking key %s, %s" % (gkey.nick, gkey.keyid))
-            self.output('', "     %s: %s" % (gkey.name, ', '.join(gkey.keyid)))
+            self.output('', "  %s: %s" % (gkey.name, ', '.join(gkey.keyid)))
+            self.output('', "  ===============")
             self.logger.debug("ACTIONS: checkkey; gkey = %s" % str(gkey))
             for key in gkey.keyid:
                 results[gkey.name] = self.gpg.check_keys(gkey.keydir, key)

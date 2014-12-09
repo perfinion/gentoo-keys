@@ -26,6 +26,31 @@ ALGORITHM_CODES = {
     '20': 'ElGamal'  # (sign and encrypt)
 }
 
+CAPABILITY_MAP = {
+    'a': 'Authenticate',
+    'c': 'Certify',
+    'e': 'Encrypt',
+    's': 'Sign',
+    'A': '(Authenticate)',
+    'C': '(Certify)',
+    'E': '(Encrypt)',
+    'S': '(Sign)',
+}
+
+VALIDITY_MAP = {
+    'o': 'Unknown',
+    'i': 'Invalid',
+    'd': 'Disabled',
+    'r': 'Revoked',
+    'e': 'Expired',
+    '-': 'Unknown',
+    'q': 'Undefined',
+    'n': 'Valid',
+    'm': 'Marginal',
+    'f': 'Fully valid',
+    'u': 'Ultimately valid',
+}
+
 VERSION_FPR_LEN = {
     32: '3',
     40: '4',
@@ -44,54 +69,95 @@ TEST_SPEC = {
     'subkeys': {        # warning/error mode
         'encrypt': {
             'mode': 'notice',
-            'expire': -1,  # -1 is the primary key expirery
+            'expire': 36,
             },
         'sign': {
             'mode': 'error',
             'expire': 12,
             },
         },
-    'type': ['DSA', 'RSA', '1', '2', '3', '17'],
+    'algorithms': ['DSA', 'RSA', '1', '2', '3', '17'],
     'versions': ['4'],
+    'qualified_id': '@gentoo.org',
 }
 
 GLEP_INDEX = {
     'key': 0,
-    'type': 1,
+    'capabilities': 1,
     'fingerprint': 2,
     'bits': 3,
     'created': 4,
     'expire': 5,
     'encrypt_capable': 6,
-    'encrypt_expirey': 7,
-    'sign_capable': 8,
-    'sign_expirey': 9,
-    'algo': 10,
-    'version': 11,
-    'gentoo_id': 12,
-    'days': 13,
+    'sign_capable': 7,
+    'algo': 8,
+    'version': 9,
+    'id': 10,
+    'days': 11,
+    'validity': 12,
+    'expire_reason': 13,
 }
 GLEP_INDEX = OrderedDict(sorted(GLEP_INDEX.items(), key=lambda t: t[1]))
 
-GLEP_STAT = ['', '','', False, False, False, False, False, False, False, False, False, False, 0]
+GLEP_STAT = ['', '','', False, False, False, False, False, False, False, False, 0, '', '']
 
+
+GLEPCHECK_STRING = '''    ----------
+    Fingerprint......: %(fingerprint)s
+    Key type ........: %(key)s    Capabilities.: %(capabilities)s
+    Algorithm........: %(algo)s   Bit Length...: %(bits)s
+    Create Date......: %(created)s   Expire Date..: %(expire)s
+    Key Version......: %(version)s   Validity.....: %(validity)s
+    Days till expiry.: %(days)s  %(expire_reason)s
+    Qualified ID.....: %(id)s'''
 
 class GlepCheck(namedtuple("GlepKey", list(GLEP_INDEX))):
 
     __slots__ = ()
 
+    def pretty_print(self):
+        data = self.convert_data()
+        output = GLEPCHECK_STRING % (data)
+        return output
+
+
+    def convert_data(self):
+        data = dict(self._asdict())
+        for f in ['bits', 'created', 'expire', 'algo', 'version']:
+            if data[f]:
+                data[f] = 'Pass'
+            else:
+                data[f] = 'Fail'
+        for f in ['encrypt_capable', 'sign_capable']:
+            if data[f]:
+                data[f] = 'True '
+            else:
+                data[f] = 'False'
+        kcaps = []
+        for cap in data['capabilities']:
+            if CAPABILITY_MAP[cap]:
+                kcaps.append(CAPABILITY_MAP[cap])
+        data['capabilities'] += ', ' + ', '.join(kcaps)
+        data['validity'] += ', %s' % (VALIDITY_MAP[data['validity']])
+        days = data['days']
+        if days == float("inf"):
+            data['days'] = "infinite"
+        else:
+            data['days'] = str(int(data['days']))
+        return data
+
 
 class KeyChecks(object):
     '''Primary gpg key validation and glep spec checks class'''
 
-    def __init__(self, logger, spec=TEST_SPEC, gentoo_id_check=True):
+    def __init__(self, logger, spec=TEST_SPEC, qualified_id_check=True):
         '''@param spec: optional gpg specification to test against
                         Defaults to TEST_SPEC
 
         '''
         self.logger = logger
         self.spec = spec
-        self.check_gentoo_id = gentoo_id_check
+        self.check_id = qualified_id_check
 
 
     def validity_checks(self, keydir, keyid, result):
@@ -158,11 +224,12 @@ class KeyChecks(object):
                     #print("new PUB:", stats)
                     results[pub.long_keyid].append(GlepCheck._make(stats))
                 pub = data
-                found_gentoo_id = False
+                found_id = False
                 results[data.long_keyid] = []
                 stats = GLEP_STAT[:]
                 stats[GLEP_INDEX['key']] = data.name
-                stats[GLEP_INDEX['type']] = data.key_capabilities
+                stats[GLEP_INDEX['capabilities']] = data.key_capabilities
+                stats[GLEP_INDEX['validity']] = data.validity
                 stats = self._test_created(data, stats)
                 stats = self._test_algo(data, stats)
                 stats = self._test_bits(data, stats)
@@ -173,21 +240,23 @@ class KeyChecks(object):
                 stats[GLEP_INDEX['fingerprint']] = data.fingerprint
                 stats = self._test_version(data, stats)
             elif data.name ==  "UID":
-                if not found_gentoo_id:
-                    stats = self._test_uid(data, stats)
-                    if stats[GLEP_INDEX['gentoo_id']]:
-                        found_gentoo_id = True
+                stats = self._test_uid(data, stats)
+                if stats[GLEP_INDEX['id']] in [True, '-----']:
+                    found_id = stats[GLEP_INDEX['id']]
             elif data.name == "SUB":
                 if stats:
                     #print("new SUB:", stats)
                     results[pub.long_keyid].append(GlepCheck._make(stats))
                 stats = GLEP_STAT[:]
                 stats[GLEP_INDEX['key']] = data.name
-                stats[GLEP_INDEX['type']] = data.key_capabilities
+                stats[GLEP_INDEX['capabilities']] = data.key_capabilities
                 stats[GLEP_INDEX['fingerprint']] = '%s' \
                     % (data.long_keyid)
-                stats[GLEP_INDEX['gentoo_id']] = found_gentoo_id
+                stats[GLEP_INDEX['id']] = found_id
+                stats[GLEP_INDEX['validity']] = data.validity
                 stats = self._test_created(data, stats)
+                stats = self._test_algo(data, stats)
+                stats = self._test_bits(data, stats)
                 stats = self._test_expire(data, stats)
                 stats = self._test_caps(data, stats)
                 #print("Finished SUB:", stats)
@@ -201,7 +270,7 @@ class KeyChecks(object):
 
     def _test_algo(self, data, stats):
         algo = data.pubkey_algo
-        if algo in TEST_SPEC['type']:
+        if algo in TEST_SPEC['algorithms']:
             stats[GLEP_INDEX['algo']] = True
         else:
             self.logger.debug("ERROR in key %s : invalid Type: %s"
@@ -211,7 +280,8 @@ class KeyChecks(object):
 
     def _test_bits(self, data, stats):
         bits = int(data.keylength)
-        if data.pubkey_algo in TEST_SPEC['type']:
+        #print("key bit length:", bits)
+        if data.pubkey_algo in TEST_SPEC['algorithms']:
             #print("bits", bits, TEST_SPEC['bits'][ALGORITHM_CODES[data.pubkey_algo]])
             if bits >= TEST_SPEC['bits'][ALGORITHM_CODES[data.pubkey_algo]]:
                 stats[GLEP_INDEX['bits']] = True
@@ -269,22 +339,20 @@ class KeyChecks(object):
         except ValueError:
             expires = float("inf")
         if expires <= (today + delta_t):
-            if data.name =="PUB":
-                stats[GLEP_INDEX['expire']] = True
-            elif data.name == "SUB":
-                if "s" in data.key_capabilities:
-                    stats[GLEP_INDEX['sign_expirey']] = True
-                elif "e" in data.key_capabilities:
-                    stats[GLEP_INDEX['encrypt_expirey']] = True
+            stats[GLEP_INDEX['expire']] = True
             stats[GLEP_INDEX['days']] = max(0, int((expires - today)/86400))
         elif expires > (today + delta_t):
             if expires == float("inf"):
                 stats[GLEP_INDEX['days']] = expires
             else:
                 stats[GLEP_INDEX['days']] = int((expires - today)/86400)
+            stats[GLEP_INDEX['expire_reason']] = '<== Exceeds specification'
         else:
             self.logger.debug("ERROR in key %s : invalid gpg key expire date: %s"
                 % (data.long_keyid, data.expiredate))
+        if 0 < expires < 30:
+               stats[GLEP_INDEX['expire_reason']] = '<== WARNING < 30 days'
+
         return stats
 
 
@@ -302,9 +370,12 @@ class KeyChecks(object):
 
 
     def _test_uid(self, data, stats):
-        if data.user_ID :
-            stats[GLEP_INDEX['gentoo_id']] = True
+        if not self.check_id:
+            stats[GLEP_INDEX['id']] = '-----'
+            return stats
+        if TEST_SPEC['qualified_id'] in data.user_ID :
+            stats[GLEP_INDEX['id']] = True
         else:
-            self.logger.debug("Warning: No @gentoo.org email addr. in key %s"
+            self.logger.debug("Warning: No qualified ID found in key %s"
                 % (data.user_ID))
         return stats
