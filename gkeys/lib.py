@@ -229,14 +229,23 @@ class GkeysGPG(GPG):
         if not result:
             result = self.list_keys(keydir, fingerprint=keyid, colons=True)
         checker = KeyChecks(logger, qualified_id_check=True)
-        #print(result.output)
-        gleps = checker.glep_check(keydir, keyid, result)
-        #print(gleps)
-        for g in gleps:
-            for key in gleps[g]:
-                print(key.pretty_print())
-        print()
         return checker.validity_checks(keydir, keyid, result)
+
+
+    def glepcheck(self, keydir, keyid, result=None):
+        '''Check specified or all keys based on the seed type
+        glep specifications are met.
+
+        @param keydir: the keydir to list the keys for
+        @param keyid: the keyid to check
+        @param result: optional pyGPG.output.GPGResult object
+        @returns: GKEY_CHECK instance
+        '''
+        if not result:
+            result = self.list_keys(keydir, fingerprint=keyid, colons=True)
+        checker = KeyChecks(logger, qualified_id_check=True)
+        gleps = checker.glep_check(keydir, keyid, result)
+        return gleps
 
 
     def list_keydirs(self):

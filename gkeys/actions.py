@@ -25,7 +25,7 @@ from gkeys.config import GKEY
 
 Available_Actions = ['listseed', 'addseed', 'removeseed', 'moveseed', 'fetchseed',
             'listseedfiles', 'listkey', 'installkey', 'removekey', 'movekey',
-            'installed', 'importkey', 'verify', 'checkkey', 'sign']
+            'installed', 'importkey', 'verify', 'checkkey', 'sign', 'glepcheck']
 
 Action_Options = {
     'listseed': ['nick', 'name', 'keydir', 'fingerprint', 'seedfile', 'file'],
@@ -43,6 +43,7 @@ Action_Options = {
     'verify': ['dest', 'nick', 'name', 'keydir', 'fingerprint', 'category', 'file', 'signature', 'keyring', 'timestamp'],
     'checkkey': ['nick', 'name', 'keydir', 'fingerprint', 'category', 'keyring', 'keyid'],
     'sign': ['nick', 'name', 'keydir', 'fingerprint', 'file', 'keyring'],
+    'glepcheck': ['nick', 'name', 'keydir', 'fingerprint', 'category', 'keyring', 'keyid'],
 }
 
 
@@ -337,6 +338,114 @@ class Actions(object):
                 'Revoked: %d' % len(failed['revoked']),
                 'Invalid: %d' % len(failed['invalid']),
                 'No signing capable subkeys: %d' % len(failed['sign'])
+            ])
+
+
+    def glepcheck(self, args):
+        '''Check keys actions'''
+        if not args.category:
+            return (False, ["Please specify seeds type."])
+        self.logger.debug("ACTIONS: glepcheck; args: %s" % str(args))
+        handler = SeedHandler(self.logger, self.config)
+        seeds = handler.load_category(args.category)
+        catdir = self.config.get_key(args.category + "-category")
+        self.logger.debug("ACTIONS: glepcheck; catdir = %s" % catdir)
+        self.gpg = GkeysGPG(self.config, catdir)
+        results = {}
+        failed = defaultdict(list)
+        kwargs = handler.build_gkeydict(args)
+        keyresults = seeds.list(**kwargs)
+        self.output('', '\n Checking keys...')
+        for gkey in sorted(keyresults):
+            self.logger.info("Checking key %s, %s" % (gkey.nick, gkey.keyid))
+            self.output('', "\n  %s: %s" % (gkey.name, ', '.join(gkey.keyid)))
+            self.output('', "  ===============")
+            self.logger.debug("ACTIONS: glepcheck; gkey = %s" % str(gkey))
+            for key in gkey.keyid:
+                results = self.gpg.glepcheck(gkey.keydir, key)
+                #print(results)
+                for g in results:
+                    #print(g)
+                    signing_subkey = False
+                    encryption_subkey = False
+                    key_passed = True
+                    pub = None
+                    for key in results[g]:
+                        #print(key)
+                        self.output('', key.pretty_print())
+
+                        if key.key is "PUB":
+                            pub = key
+
+                        if key.key is "SUB" and key.sign_capable:
+                            #print("FOUND SIGNING SUBKEY")
+                            signing_subkey = True
+                        if key.key is "SUB" and key.encrypt_capable:
+                            #~ #print("FOUND ENCRYPTION SUBKEY")
+                            encryption_subkey = True
+                        validity = key.validity.split(',')[0]
+                        if not key.expire and not 'r' in validity:
+                            failed['expired'].append("%s <%s>: %s" % (gkey.name, gkey.nick, key.fingerprint))
+                            key_passed = False
+                        if 'r' in validity:
+                            failed['revoked'].append("%s <%s>: %s" % (gkey.name, gkey.nick, key.fingerprint))
+                            key_passed = False
+                        if 'i' in validity:
+                            failed['invalid'].append("%s <%s>: %s" % (gkey.name, gkey.nick, key.fingerprint))
+                            key_passed = False
+                        if not key.algo:
+                            failed['algo'].append("%s <%s>: %s" % (gkey.name, gkey.nick, key.fingerprint))
+                            key_passed = False
+                        if not key.bits:
+                            failed['bits'].append("%s <%s>: %s" % (gkey.name, gkey.nick, key.fingerprint))
+                            key_passed = False
+                        if "Warning" in key.expire_reason:
+                            failed['warn'].append("%s <%s>: %s " % (gkey.name, gkey.nick, key.fingerprint))
+                    if not signing_subkey:
+                        failed['sign'].append("%s <%s>: %s" % (gkey.name, gkey.nick, pub.fingerprint))
+                    if not encryption_subkey:
+                        failed['encrypt'].append("%s <%s>: %s" % (gkey.name, gkey.nick, pub.fingerprint))
+                    if not key_passed and not signing_subkey:
+                        failed['glep'].append("%s <%s>: %s" % (gkey.name, gkey.nick, pub.fingerprint))
+                        self.output('', '    GLEP requirements: Fail   Encryption subkey: %s' % encryption_subkey)
+                    else:
+                        failed['glep-approved'].append("%s <%s>: %s" % (gkey.name, gkey.nick, pub.fingerprint))
+                        self.output('', '    GLEP requirements: Pass   Encryption subkey: %s' % encryption_subkey)
+
+        if failed['expired']:
+            self.output([sorted(set(failed['expired']))], '\n Expiry keys:')
+        if failed['revoked']:
+            self.output([sorted(set(failed['revoked']))], '\n Revoked keys:')
+        if failed['invalid']:
+            self.output([sorted(set(failed['invalid']))], '\n Invalid keys:')
+        if failed['sign']:
+            self.output([sorted(set(failed['sign']))], '\n No signing capable subkey:')
+        if failed['encrypt']:
+            self.output([sorted(set(failed['encrypt']))], '\n No Encryption capable subkey:')
+        if failed['algo']:
+            self.output([sorted(set(failed['algo']))], '\n Incorrect Algorithm:')
+        if failed['bits']:
+            self.output([sorted(set(failed['bits']))], '\n Incorrect bit length:')
+        if failed['glep']:
+            self.output([sorted(set(failed['glep']))], '\n Failed to pass GLEP requirements:')
+        if failed['warn']:
+            self.output([sorted(set(failed['warn']))], '\n Expiry Warnings:')
+        if failed['glep-approved']:
+            self.output([sorted(set(failed['glep-approved']))], '\n GLEP Approved:')
+
+        return (len(failed) <1,
+            ['\nFound Failures:\n-------',
+                'Expiry.................: %d' % len(failed['expired']),
+                'Revoked................: %d' % len(failed['revoked']),
+                'Invalid................: %d' % len(failed['invalid']),
+                'No Signing subkey......: %d' % len(failed['sign']),
+                'No Encryption subkey...: %d' % len(failed['encrypt']),
+                'GLEP requirements......: %d' % len(failed['glep']),
+                'Algorithm..............: %d' % len(failed['algo']),
+                'Bit length.............: %d' % len(failed['bits']),
+                'Expiry Warnings........: %d' % len(failed['warn']),
+                '=============================',
+                'GLEP Approved..........: %d' % len(failed['glep-approved']),
             ])
 
 

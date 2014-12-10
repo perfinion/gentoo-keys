@@ -35,6 +35,7 @@ CAPABILITY_MAP = {
     'C': '(Certify)',
     'E': '(Encrypt)',
     'S': '(Sign)',
+    '?': 'Unknown',
 }
 
 VALIDITY_MAP = {
@@ -96,15 +97,17 @@ GLEP_INDEX = {
     'days': 11,
     'validity': 12,
     'expire_reason': 13,
+    'long_caps': 14,  # long version of the capbilities
 }
 GLEP_INDEX = OrderedDict(sorted(GLEP_INDEX.items(), key=lambda t: t[1]))
 
-GLEP_STAT = ['', '','', False, False, False, False, False, False, False, False, 0, '', '']
+GLEP_STAT = ['', '','', False, False, False, False, False, False, False, False,
+    0, '', '', '']
 
 
 GLEPCHECK_STRING = '''    ----------
     Fingerprint......: %(fingerprint)s
-    Key type ........: %(key)s    Capabilities.: %(capabilities)s
+    Key type ........: %(key)s    Capabilities.: %(capabilities)s  %(long_caps)s
     Algorithm........: %(algo)s   Bit Length...: %(bits)s
     Create Date......: %(created)s   Expire Date..: %(expire)s
     Key Version......: %(version)s   Validity.....: %(validity)s
@@ -133,11 +136,6 @@ class GlepCheck(namedtuple("GlepKey", list(GLEP_INDEX))):
                 data[f] = 'True '
             else:
                 data[f] = 'False'
-        kcaps = []
-        for cap in data['capabilities']:
-            if CAPABILITY_MAP[cap]:
-                kcaps.append(CAPABILITY_MAP[cap])
-        data['capabilities'] += ', ' + ', '.join(kcaps)
         data['validity'] += ', %s' % (VALIDITY_MAP[data['validity']])
         days = data['days']
         if days == float("inf"):
@@ -357,15 +355,22 @@ class KeyChecks(object):
 
 
     def _test_caps(self, data, stats):
+        kcaps = []
         for cap in data.key_capabilities:
             #print("cap", cap)
-            if cap in ["s"]:
-                stats[GLEP_INDEX['sign_capable']] = True
-            elif cap in ["e"]:
-                stats[GLEP_INDEX['encrypt_capable']] = True
-            else:
-                self.logger.debug("ERROR in key %s : unknown gpg key capability: %s"
-                    % (data.long_keyid, cap))
+            if CAPABILITY_MAP[cap]:
+                kcaps.append(CAPABILITY_MAP[cap])
+            if not ('i' in data.validity or
+                'r' in data.validity or
+                'e' in data.validity):
+                if cap in ["s"]:
+                    stats[GLEP_INDEX['sign_capable']] = True
+                elif cap in ["e"]:
+                    stats[GLEP_INDEX['encrypt_capable']] = True
+                else:
+                    self.logger.debug("ERROR in key %s : unknown gpg key capability: %s"
+                        % (data.long_keyid, cap))
+        stats[GLEP_INDEX['long_caps']] = ', '.join(kcaps)
         return stats
 
 
