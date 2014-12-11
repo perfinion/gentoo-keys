@@ -257,7 +257,7 @@ class GkeysGPG(GPG):
         @param keydir: the keydir to list the keys for
         @param keyid: the keyid to check
         @param result: optional pyGPG.output.GPGResult object
-        @returns: GKEY_CHECK instance
+        @returns: GlepCheck instance
         '''
         if not result:
             result = self.list_keys(keydir, fingerprint=keyid, colons=True)
