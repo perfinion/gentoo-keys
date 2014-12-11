@@ -46,6 +46,7 @@ Action_Options = {
     'sign': ['nick', 'name', 'keydir', 'fingerprint', 'file', 'keyring'],
     'glepcheck': ['nick', 'name', 'keydir', 'fingerprint', 'category', 'keyring', 'keyid'],
     'refreshkey': ['nick', 'name', 'keydir', 'fingerprint', 'category', 'keyring', 'keyid'],
+    'verifykey': ['nick', 'name', 'keydir', 'fingerprint', 'category', 'keyring', 'keyid'],
 }
 
 
