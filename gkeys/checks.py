@@ -27,10 +27,10 @@ ALGORITHM_CODES = {
 }
 
 CAPABILITY_MAP = {
-    'a': 'Authenticate',
-    'c': 'Certify',
-    'e': 'Encrypt',
-    's': 'Sign',
+    'a': 'authenticate',
+    'c': 'certify',
+    'e': 'encrypt',
+    's': 'sign',
     'A': '(Authenticate)',
     'C': '(Certify)',
     'E': '(Encrypt)',
@@ -66,21 +66,23 @@ TEST_SPEC = {
         'DSA': 2048,
         'RSA': 2048,
         },
-    'expire': 36,      # in months
+    'expire': 3 * 365,      # in days
     'subkeys': {        # warning/error mode
         'encrypt': {
             'mode': 'notice',
-            'expire': 36,
+            'expire': 3 * 365,
             },
         'sign': {
             'mode': 'error',
-            'expire': 12,
+            'expire': 365,
             },
         },
     'algorithms': ['DSA', 'RSA', '1', '2', '3', '17'],
     'versions': ['4'],
     'qualified_id': '@gentoo.org',
 }
+
+SECONDS_PER_DAY = 86400
 
 GLEP_INDEX = {
     'key': 0,
@@ -315,17 +317,18 @@ class KeyChecks(object):
 
     def _test_expire(self, data, stats):
         if data.name in ["PUB"]:
-            delta_t = TEST_SPEC['expire'] * 2629744
+            delta_t = TEST_SPEC['expire']
             stats = self._expire_check(data, stats, delta_t)
             return stats
         else:
             for cap in data.key_capabilities:
-                if "s" in cap:
-                    delta_t = TEST_SPEC['subkeys']['sign']['expire'] * 2629744
-                if "e" in data.key_capabilities:
-                    delta_t = TEST_SPEC['subkeys']['encrypt']['expire'] * 2629744
-                else:
-                    delta_t = 0
+                try:
+                    delta_t = TEST_SPEC['subkeys'][CAPABILITY_MAP[cap]]['expire']
+                except KeyError:
+                    self.logger.debug(
+                        "ERROR in capability key %s : setting delta_t to main expiry: %d"
+                        % (cap, TEST_SPEC['expire']))
+                    delta_t = TEST_SPEC['expire']
                 stats = self._expire_check(data, stats, delta_t)
                 return stats
 
@@ -336,19 +339,18 @@ class KeyChecks(object):
             expires = float(data.expiredate)
         except ValueError:
             expires = float("inf")
-        if expires <= (today + delta_t):
+        if expires == float("inf"):
+            days = stats[GLEP_INDEX['days']] = expires
+        else:
+            days = stats[GLEP_INDEX['days']] = max(0, int((expires - today)/SECONDS_PER_DAY))
+        if days <= delta_t:
             stats[GLEP_INDEX['expire']] = True
-            stats[GLEP_INDEX['days']] = max(0, int((expires - today)/86400))
-        elif expires > (today + delta_t):
-            if expires == float("inf"):
-                stats[GLEP_INDEX['days']] = expires
-            else:
-                stats[GLEP_INDEX['days']] = int((expires - today)/86400)
+        elif days > delta_t:
             stats[GLEP_INDEX['expire_reason']] = '<== Exceeds specification'
         else:
             self.logger.debug("ERROR in key %s : invalid gpg key expire date: %s"
                 % (data.long_keyid, data.expiredate))
-        if 0 < expires < 30:
+        if 0 < days < 30:
                stats[GLEP_INDEX['expire_reason']] = '<== WARNING < 30 days'
 
         return stats
